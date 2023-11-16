@@ -82,6 +82,14 @@ To use this command, visually select the lines of code you want to extend, then 
 
 The ChatGPT response will be displayed in a new buffer.
 
+### Creating your own functions and prompts
+You can specify own prompts by defining g:chat_gpt_custom_prompts in your .vimrc.
+For example
+```vim
+let g:chat_gpt_custom_prompts = {'complete': 'As a senior software developer produce code which fulfills the requirements presented in the function signature and documentation. Give me only the code without any additional explanations'}
+command! -range -nargs=? Complete call SendHighlightedCodeToChatGPT('complete', <q-args>)
+```
+
 ## Mappings
 
 This plugin exposes a binding to open a menu for options on a visual selecition. You can map it like this:

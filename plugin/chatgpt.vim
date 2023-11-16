@@ -49,6 +49,7 @@ if !exists("g:chat_gpt_split_direction")
   let g:chat_gpt_split_direction = 'horizontal'
 endif
 
+
 " Function to show ChatGPT responses in a new buffer
 function! DisplayChatGPTResponse(response, finish_reason, chat_gpt_session_id)
   let response = a:response
@@ -218,21 +219,7 @@ function! SendHighlightedCodeToChatGPT(ask, context)
     let yanked_text = '```' . syntax . "\n" . @@ . "\n" . '```'
   endif
 
-  let prompt_templates = {
-  \ 'rewrite': 'Can you rewrite it more idiomatically?',
-  \ 'review': 'Can you provide a code review for?',
-  \ 'document': 'Return documentation following language pattern conventions.',
-  \ 'explain': 'Can you explain it?',
-  \ 'test': 'Can you write a test for it?',
-  \ 'fix': 'It has an error I need you to fix.'
-  \}
-
-  let prompt = a:context . ' ' . "\n" . yanked_text
-
-  if has_key(prompt_templates, a:ask)
-    let template  = "Given the following code snippet ". prompt_templates[a:ask]
-    let prompt = template . "\n" . yanked_text . "\n" . a:context
-  endif
+  let prompt = g:prompt_templates[a:ask] . "\n" . yanked_text . "\n" . a:context
 
   call ChatGPT(prompt)
 
@@ -266,15 +253,18 @@ endfunction
 
 " Menu for ChatGPT
 function! s:ChatGPTMenuSink(id, choice)
+  " User inputs number between 1 and number of choices
   call popup_hide(a:id)
-  let choices = {1:'Ask', 2:'rewrite', 3:'explain', 4:'test', 5:'review', 6:'document'}
-  if a:choice > 0 && a:choice < 6
-    call SendHighlightedCodeToChatGPT(choices[a:choice], input('Prompt > '))
-  endif
+  let choices = keys(g:prompt_templates)
+
+  call SendHighlightedCodeToChatGPT(choices[a:choice-1], input('Prompt > '))
 endfunction
 
 function! s:ChatGPTMenuFilter(id, key)
-  if a:key == '1' || a:key == '2' || a:key == '3' || a:key == '4' || a:key == '5'
+  let max_key = len(keys(g:prompt_templates))
+
+  " Check that key is between 1 and number of available commands
+  if a:key >= 1 && a:key <= max_key
     call s:ChatGPTMenuSink(a:id, a:key)
   else " No shortcut, pass to generic filter
     return popup_filter_menu(a:id, a:key)
@@ -282,8 +272,14 @@ function! s:ChatGPTMenuFilter(id, key)
 endfunction
 
 function! ChatGPTMenu() range
+  let options = keys(g:prompt_templates) 
+
+  for i in range(len(options))
+      let options[i] = i + 1 . ". " . substitute(options[i], '\v(\w)', '\u\1', '')
+  endfor
+
   echo a:firstline. a:lastline
-  call popup_menu([ '1. Ask', '2. Rewrite', '3. Explain', '4. Test', '5. Review', '6. Document'], #{
+  call popup_menu(options, #{
         \ pos: 'topleft',
         \ line: 'cursor',
         \ col: 'cursor+2',
@@ -310,5 +306,19 @@ command! -range -nargs=? Document call SendHighlightedCodeToChatGPT('document', 
 command! -range -nargs=? Rewrite call SendHighlightedCodeToChatGPT('rewrite', <q-args>)
 command! -range -nargs=? Test call SendHighlightedCodeToChatGPT('test',<q-args>)
 command! -range -nargs=? Fix call SendHighlightedCodeToChatGPT('fix', <q-args>)
+
+let g:prompt_templates = {
+\ 'ask': '',
+\ 'rewrite': 'Can you rewrite it more idiomatically?',
+\ 'review': 'Can you provide a code review for?',
+\ 'document': 'Return documentation following language pattern conventions.',
+\ 'explain': 'Can you explain it?',
+\ 'test': 'Can you write a test for it?',
+\ 'fix': 'It has an error I need you to fix.'
+\}
+
+if exists('g:chat_gpt_custom_prompts')
+  call extend(g:prompt_templates, g:chat_gpt_custom_prompts)
+endif
 
 command! GenerateCommit call GenerateCommitMessage()
